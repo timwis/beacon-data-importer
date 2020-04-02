@@ -7,7 +7,7 @@ With Python 3 and [Pipenv][pipenv] installed:
 
 1. Clone this repository and run `pipenv install` within it.
 2. Run `pipenv shell` to activate a local environment shell.
-3. Run the script using `python bin/cli.py`
+3. Run the script using `python cli.py`
 
 ```
 Usage: cli.py [OPTIONS] FILE_PATH
@@ -19,5 +19,5 @@ Options:
 Basic example:
 
 ```
-python bin/cli.py people.xlsx > contacts.csv
+python cli.py people.csv > contacts.csv
 ```
