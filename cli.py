@@ -4,30 +4,6 @@ from datetime import datetime
 import click
 import petl as etl
 
-def serialize_row(keys):
-  return lambda row: json.dumps(dict(zip(keys, row)))
-
-# Concatenate non-empty address parts with ', ' separator
-def concat_address(row):
-  parts = [ row['Address1'], row['Address2'],
-            row['Address3'], row['Address4'],
-            row['Address5'], row['Postcode'] ]
-  nonempty_parts = [part for part in parts if part]
-  return ', '.join(nonempty_parts)
-
-# '31/01/1980' => '1980-03-31'
-def parse_date(value):
-  if value == '':
-    return None
-
-  input_format = '%d/%m/%Y'
-  return datetime.strptime(value, input_format).date()
-
-def add_leading_zero_if_missing(value):
-  if value[0] != '0':
-    return '0' + value
-  else:
-    return value
 
 @click.command()
 @click.argument('gds_file_path')
@@ -77,6 +53,31 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
 
   etl.join(gds_table, healthintent_table, key='nhs_number') \
     .tocsv()
+
+def serialize_row(keys):
+  return lambda row: json.dumps(dict(zip(keys, row)))
+
+# Concatenate non-empty address parts with ', ' separator
+def concat_address(row):
+  parts = [ row['Address1'], row['Address2'],
+            row['Address3'], row['Address4'],
+            row['Address5'], row['Postcode'] ]
+  nonempty_parts = [part for part in parts if part]
+  return ', '.join(nonempty_parts)
+
+# '31/01/1980' => '1980-03-31'
+def parse_date(value):
+  if value == '':
+    return None
+
+  input_format = '%d/%m/%Y'
+  return datetime.strptime(value, input_format).date()
+
+def add_leading_zero_if_missing(value):
+  if value[0] != '0':
+    return '0' + value
+  else:
+    return value
 
 if __name__ == '__main__':
   prepare_contacts()
