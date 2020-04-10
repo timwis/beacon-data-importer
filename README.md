@@ -10,7 +10,10 @@ With Python 3 and [Pipenv][pipenv] installed:
 3. Run the script using `python cli.py`
 
 ```
-Usage: cli.py [OPTIONS] FILE_PATH
+Usage: cli.py [OPTIONS] GDS_FILE_PATH HEALTHINTENT_FILE_PATH
+
+  Extract core contact fields from gds_file_path, and add a serialized
+  version of the records from each file as json columns
 
 Options:
   --help                   Show this message and exit.
@@ -19,5 +22,5 @@ Options:
 Basic example:
 
 ```
-python cli.py people.csv > contacts.csv
+python cli.py data/gds.csv data/healthintent.csv > contacts.csv
 ```
