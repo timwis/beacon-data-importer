@@ -6,10 +6,10 @@ import click
 import petl as etl
 
 @click.group()
-def cli():
+def main():
   pass
 
-@cli.command()
+@main.command()
 @click.argument('gds_file_path')
 @click.argument('healthintent_file_path')
 def prepare_contacts(gds_file_path, healthintent_file_path):
@@ -59,7 +59,7 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
   etl.join(gds_table, healthintent_table, key='nhs_number') \
     .tocsv()
 
-@cli.command()
+@main.command()
 @click.argument('calls_file_path')
 def prepare_calls(calls_file_path):
   """Prepares call log records for import into a temporary calls table"""
@@ -112,4 +112,4 @@ def compose_body(keys):
                                 if key not in keys_to_omit and row[key]])
 
 if __name__ == '__main__':
-  cli()
+  main()

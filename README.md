@@ -2,15 +2,17 @@
 Convert person data to a CSV format that can easily be imported
 to Beacon's database.
 
-## Usage
-With Python 3 and [Pipenv][pipenv] installed:
+## Installation
 
-1. Clone this repository and run `pipenv install` within it.
-2. Run `pipenv shell` to activate a local environment shell.
-3. Run the script using `python cli.py`
+Ensure you have Python 3.7+ installed on your machine.
 
 ```
-Usage: cli.py [OPTIONS] COMMAND [ARGS]...
+pip3 install "git+https://github.com/timwis/beacon-data-importer#egg=beacon-data-importer"
+```
+
+## Usage
+```
+Usage: beacon [OPTIONS] COMMAND [ARGS]...
 
 Options:
   --help  Show this message and exit.
