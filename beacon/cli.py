@@ -73,6 +73,7 @@ def prepare_calls(calls_file_path):
     .addfield('body', compose_body(calls_header)) \
     .rename({'Shielded ID': 'shielded_id',
              'Contact attempted (date)': 'latest_attempt_date'}) \
+    .select(has_non_empty_latest_attempt_date) \
     .convert('latest_attempt_date', parse_date) \
     .cut('shielded_id',
          'latest_attempt_date',
@@ -93,9 +94,6 @@ def concat_address(row):
 
 # '31/01/1980' => '1980-03-31'
 def parse_date(value):
-  if value == '':
-    return None
-
   input_format = '%d/%m/%Y'
   return datetime.strptime(value, input_format).date()
 
@@ -107,9 +105,12 @@ def add_leading_zero_if_missing(value):
 
 def compose_body(keys):
   keys_to_omit = ['Shielded ID', 'Contact attempted (date)', 'Time', 'import_data']
-  return lambda row: "\n".join([f"{key.strip()}: {row[key]}"
+  return lambda row: "\n".join([f"{key.strip()}: {row[key].strip()}"
                                 for key in keys
-                                if key not in keys_to_omit and row[key]])
+                                if key not in keys_to_omit and row[key].strip()])
+
+def has_non_empty_latest_attempt_date(row):
+  return row['latest_attempt_date']
 
 if __name__ == '__main__':
   main()
