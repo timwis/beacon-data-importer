@@ -17,9 +17,11 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
      version of the records from each file as json columns."""
 
   now = datetime.now().isoformat()
+  gds_table = etl.fromcsv(gds_file_path)
+  gds_header = gds_table.fieldnames()
 
-  gds_table = etl.fromcsv(gds_file_path) \
-    .addfield('gds_import_data', serialize_row) \
+  gds_table = gds_table \
+    .addfield('gds_import_data', serialize_row(gds_header)) \
     .addfield('created_at', now) \
     .addfield('updated_at', now) \
     .addfield('address', concat_address) \
@@ -46,8 +48,11 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
          'updated_at',
          'gds_import_data')
 
-  healthintent_table = etl.fromcsv(healthintent_file_path) \
-    .addfield('healthintent_import_data', serialize_row) \
+  healthintent_table = etl.fromcsv(healthintent_file_path)
+  healthintent_header = healthintent_table.fieldnames()
+
+  healthintent_table = healthintent_table \
+    .addfield('healthintent_import_data', serialize_row(healthintent_header)) \
     .rename('NHS number', 'nhs_number') \
     .cut('nhs_number', 'healthintent_import_data')
 
@@ -60,9 +65,12 @@ def prepare_calls(calls_file_path):
   """Prepares call log records for import into a temporary calls table"""
 
   # Expected file is in 'windows-1252' file encoding
-  etl.fromcsv(calls_file_path, encoding='windows-1252') \
-    .addfield('import_data', serialize_row) \
-    .addfield('body', compose_body) \
+  calls_table = etl.fromcsv(calls_file_path, encoding='windows-1252')
+  calls_header = calls_table.fieldnames()
+
+  calls_table \
+    .addfield('import_data', serialize_row(calls_header)) \
+    .addfield('body', compose_body(calls_header)) \
     .rename({'Shielded ID': 'shielded_id',
              'Contact attempted (date)': 'latest_attempt_date'}) \
     .convert('latest_attempt_date', parse_date) \
@@ -72,9 +80,8 @@ def prepare_calls(calls_file_path):
          'import_data') \
     .tocsv()
 
-def serialize_row(row):
-  keys = row.flds # Note: flds is an undocumented property
-  return json.dumps(dict(zip(keys, row)))
+def serialize_row(keys):
+  return lambda row: json.dumps(dict(zip(keys, row)))
 
 # Concatenate non-empty address parts with ', ' separator
 def concat_address(row):
@@ -98,12 +105,11 @@ def add_leading_zero_if_missing(value):
   else:
     return value
 
-def compose_body(row):
+def compose_body(keys):
   keys_to_omit = ['Shielded ID', 'Contact attempted (date)', 'Time', 'import_data']
-  lines = [f"{key}: {row[key]}"
-          for key in row.flds # Note: flds is an undocumented property
-          if key not in keys_to_omit and row[key]]
-  return "\n".join(lines)
+  return lambda row: "\n".join([f"{key.strip()}: {row[key]}"
+                                for key in keys
+                                if key not in keys_to_omit and row[key]])
 
 if __name__ == '__main__':
   cli()
