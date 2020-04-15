@@ -11,16 +11,15 @@ def main():
 
 @main.command()
 @click.argument('gds_file_path')
-@click.argument('healthintent_file_path')
-def prepare_contacts(gds_file_path, healthintent_file_path):
+def prepare_contacts(gds_file_path):
   """Extracts core contact fields from gds_file_path, and adds a serialized
-     version of the records from each file as json columns."""
+     version of the records from as a json column."""
 
   now = datetime.now().isoformat()
   gds_table = etl.fromcsv(gds_file_path)
   gds_header = gds_table.fieldnames()
 
-  gds_table = gds_table \
+  gds_table \
     .addfield('gds_import_data', serialize_row(gds_header)) \
     .addfield('created_at', now) \
     .addfield('updated_at', now) \
@@ -34,7 +33,6 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
              'Phone': 'telephone',
              'Mobile': 'mobile'}) \
     .convert('date_of_birth', parse_date) \
-    .convert(('telephone', 'mobile'), add_leading_zero_if_missing) \
     .cut('nhs_number',
          'first_name',
          'middle_names',
@@ -46,17 +44,7 @@ def prepare_contacts(gds_file_path, healthintent_file_path):
          'date_of_birth',
          'created_at',
          'updated_at',
-         'gds_import_data')
-
-  healthintent_table = etl.fromcsv(healthintent_file_path)
-  healthintent_header = healthintent_table.fieldnames()
-
-  healthintent_table = healthintent_table \
-    .addfield('healthintent_import_data', serialize_row(healthintent_header)) \
-    .rename('NHS number', 'nhs_number') \
-    .cut('nhs_number', 'healthintent_import_data')
-
-  etl.join(gds_table, healthintent_table, key='nhs_number') \
+         'gds_import_data') \
     .tocsv()
 
 @main.command()
@@ -96,12 +84,6 @@ def concat_address(row):
 def parse_date(value):
   input_format = '%d/%m/%Y'
   return datetime.strptime(value, input_format).date()
-
-def add_leading_zero_if_missing(value):
-  if value[0] != '0':
-    return '0' + value
-  else:
-    return value
 
 def compose_body(keys):
   keys_to_omit = ['Shielded ID', 'Contact attempted (date)', 'Time', 'import_data']

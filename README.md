@@ -50,7 +50,7 @@ beacon prepare-contacts gds.csv healthintent.csv > contacts.csv
 Load `contacts.csv` into the `contacts` table, which should already be created by the application's migrations.
 
 ```bash
-heroku pg:psql --app <app-name> --command "\COPY contacts (nhs_number, first_name, middle_names, surname, address, postcode, telephone, mobile, date_of_birth, created_at, updated_at, gds_import_data, healthintent_import_data) FROM contacts.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY contacts (nhs_number, first_name, middle_names, surname, address, postcode, telephone, mobile, date_of_birth, created_at, updated_at, gds_import_data) FROM contacts.csv DELIMITER ',' CSV HEADER"
 ```
 
 ## Call logs
