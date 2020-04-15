@@ -70,7 +70,7 @@ heroku pg:psql --app <app-name> --file sql/create_tmp_calls_table.sql
 Load `clean-calls.csv` into that table.
 
 ```bash
-heroku pg:psql --app <app-name> --command "\COPY tmp_calls (shielded_id, latest_attempt_date, body, import_data) FROM clean-calls.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_calls (nhs_number, latest_attempt_date, body, import_data) FROM clean-calls.csv DELIMITER ',' CSV HEADER"
 ```
 
 You can verify it's been loaded in via the psql tool. Use `\q` to quit.
