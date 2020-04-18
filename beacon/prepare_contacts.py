@@ -16,7 +16,7 @@ def prepare_contacts(gds_file_path):
   gds_header = gds_table.fieldnames()
 
   gds_table \
-    .addfield('gds_import_data', serialize_row(gds_header)) \
+    .addfield('gds_import_data', partial(serialize_row, keys=gds_header)) \
     .addfield('created_at', now) \
     .addfield('updated_at', now) \
     .addfield('address', concat_address) \

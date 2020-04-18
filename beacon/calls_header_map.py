@@ -55,7 +55,7 @@ header_map = {
     'original': 'Delivery contact details if different? Eg if someone needs to let deliverer in. Contact name and number',
     'label': 'Delivery contact details'
   },
-  'delivery_details': {
+  'delivery_special_info': {
     'original': "Any special delivery information - any times you cannot do/access?  Eg how to get to block/house/intercome/doorbell doesn't work - times to avoid eg when taking medication",
     'label': 'Any special delivery information'
   },
@@ -74,6 +74,18 @@ header_map = {
   'addl_safeguarding': {
     'original': 'Additional Support: Safeguarding Complete if you or resident have concerns and want follow up action.',
     'label': 'Additional support: Safeguarding'
+  },
+  'addl_mental_wellbeing': {
+    'original': 'Additional Support: Mental Wellbeing Referral Complete if you or resident have concerns and want follow up action.',
+    'label': 'Additional support: Mental wellbeing'
+  },
+  'addl_housing_waste': {
+    'original': 'Additional Support: Housing/ Waste Disposal. Complete if you or resident have concerns and want follow up action.',
+    'label': 'Additional support: Housing/waste disposal'
+  },
+  'addl_medication_prescriptions': {
+    'original': 'Additional Support: Medication/ prescriptions. ',
+    'label': 'Additional support: Medication/prescriptions'
   },
   'addl_medical_appt_transport': {
     'original': 'Additional Support: Medical appointment Transport. ',
