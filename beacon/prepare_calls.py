@@ -31,11 +31,11 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .convert('latest_attempt_date', parse_date)
 
   original_triage_needs = spreadsheet \
-    .rename({'latest_attempt_date': 'created_at'}) \
-    .addfield('updated_at', lambda row: row['created_at']) \
     .addfield('completed_on', determine_triage_completion) \
     .addfield('category', 'phone triage') \
     .addfield('name', MSG_ORIGINAL_TRIAGE_NEED) \
+    .addfield('updated_at', lambda row: row['latest_attempt_date']) \
+    .rename({'latest_attempt_date': 'created_at'}) \
     .cut('nhs_number',
          'category',
          'name',
@@ -48,8 +48,8 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
   call_notes = spreadsheet \
     .selectnotnone('was_contact_made') \
     .rowmapmany(generate_call_notes, header=generated_header) \
+    .addfield('updated_at', lambda row: row['latest_attempt_date']) \
     .rename({'latest_attempt_date': 'created_at'}) \
-    .addfield('updated_at', lambda row: row['created_at']) \
     .cut('nhs_number',
          'category',
          'body',
@@ -58,9 +58,9 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
 
   import_notes = spreadsheet \
     .addfield('body', compose_body) \
-    .rename({'latest_attempt_date': 'created_at'}) \
-    .addfield('updated_at', lambda row: row['created_at']) \
     .addfield('category', 'phone_import') \
+    .addfield('updated_at', lambda row: row['latest_attempt_date']) \
+    .rename({'latest_attempt_date': 'created_at'}) \
     .cut('nhs_number',
          'category',
          'body',
@@ -68,10 +68,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
          'updated_at',
          'import_data')
 
-  # TODO: Assign to food team?
   identified_food_needs = spreadsheet \
-    .rename({'latest_attempt_date': 'created_at'}) \
-    .addfield('updated_at', lambda row: row['created_at']) \
     .select(needs_food) \
     .addfield('category', 'groceries and cooked meals') \
     .convert('food_priority', parse_food_priority) \
@@ -79,6 +76,8 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('completed_on', determine_food_completion) \
     .addfield('user_id', food_team_user) \
     .addfield('name', compose_food_need_desc) \
+    .addfield('updated_at', lambda row: row['latest_attempt_date']) \
+    .rename({'latest_attempt_date': 'created_at'}) \
     .cut('nhs_number',
          'category',
          'name',
@@ -89,21 +88,21 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
          'updated_at')
 
   callback_needs = spreadsheet \
-    .rename({'latest_attempt_date': 'created_at'}) \
-    .addfield('updated_at', lambda row: row['created_at']) \
     .convert('callback_date', parse_callback_date) \
     .select(needs_callback) \
     .addfield('category', 'phone triage') \
     .addfield('name', compose_callback_need_desc) \
     .addfield('start_on', determine_callback_start_date) \
+    .addfield('updated_at', lambda row: row['latest_attempt_date']) \
+    .rename({'latest_attempt_date': 'created_at'}) \
     .cut('nhs_number',
          'category',
          'name',
          'created_at',
          'updated_at',
-         'start_on').tocsv()
+         'start_on')
 
-  # TODO: 'Other' needs, 'Addl' needs, person data (e.g. dietary reqs)
+  # TODO: 'Addl' needs, person data (e.g. dietary reqs)
 
 # Impure: Uses global header_map variable
 def compose_body(row):
@@ -114,7 +113,7 @@ def compose_body(row):
 
 def determine_triage_completion(row):
   completed_values = ['yes', 'no 3 attempts made']
-  return row['created_at'] if row['was_contact_made'].lower() in completed_values else None
+  return row['latest_attempt_date'] if row['was_contact_made'].lower() in completed_values else None
 
 def generate_call_notes(row):
   was_contact_made = row['was_contact_made'].lower()
@@ -146,7 +145,7 @@ def parse_food_priority(value):
            .group(1)
 
 def determine_food_completion(row):
-  return row['created_at'] if row['food_priority'] in ['1', '2'] else None
+  return row['latest_attempt_date'] if row['food_priority'] in ['1', '2'] else None
 
 # TODO: Add food_service_type, if possible
 def construct_supplemental_data(row):
@@ -189,7 +188,7 @@ def needs_callback(row):
 
 def determine_callback_start_date(row):
   return row['callback_date'] \
-         or date.fromisoformat(row['created_at']) + timedelta(days=6)
+         or date.fromisoformat(row['latest_attempt_date']) + timedelta(days=6)
 
 # needs.name is used as a description in the app
 def compose_callback_need_desc(row):
