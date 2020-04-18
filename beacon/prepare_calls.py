@@ -1,11 +1,16 @@
+import re
+import json
+
 import click
 import petl as etl
 
 from .helpers import serialize_row, parse_date
 from .calls_header_map import header_map, rename_map
 
-MSG_ORIGINAL_TRIAGE_NEED = 'Imported from call log spreadsheet'
-MSG_CALL_LOG_NOTE = 'Imported call log'
+MSG_ORIGINAL_TRIAGE_NEED = '[Import]: Imported from call log spreadsheet'
+MSG_CALL_LOG_NOTE = '[Import]: Imported call log'
+MSG_IDENTIFIED_NEED = '[Import]: Need identified automatically from imported call log'
+MSG_CLOSED_FOOD_NEED = '[Import]: Marked completed because priority 1 and 2 food needs were all met by the time of data import'
 
 @click.command()
 @click.argument('calls_file_path')
@@ -24,7 +29,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
   original_triage_needs = spreadsheet \
     .rename({'latest_attempt_date': 'created_at'}) \
     .addfield('updated_at', lambda row: row['created_at']) \
-    .addfield('completed_on', lambda row: row['created_at'] if is_completed(row) else None) \
+    .addfield('completed_on', determine_triage_completion) \
     .addfield('category', 'phone triage') \
     .addfield('name', MSG_ORIGINAL_TRIAGE_NEED) \
     .cut('nhs_number',
@@ -34,10 +39,11 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
          'created_at',
          'updated_at')
 
-  call_notes_header = ['nhs_number', 'latest_attempt_date', 'category', 'body']
+  # TODO: infer voicemail notes from outcome field
+  generated_header = ['nhs_number', 'latest_attempt_date', 'category', 'body']
   call_notes = spreadsheet \
     .selectnotnone('was_contact_made') \
-    .rowmapmany(generate_call_notes, header=call_notes_header) \
+    .rowmapmany(generate_call_notes, header=generated_header) \
     .rename({'latest_attempt_date': 'created_at'}) \
     .addfield('updated_at', lambda row: row['created_at']) \
     .cut('nhs_number',
@@ -56,7 +62,24 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
          'body',
          'created_at',
          'updated_at',
-         'import_data').tocsv()
+         'import_data')
+
+  identified_food_needs = spreadsheet \
+    .rename({'latest_attempt_date': 'created_at'}) \
+    .addfield('updated_at', lambda row: row['created_at']) \
+    .selectin('outcome', ['Food referral', 'Food and Other referral']) \
+    .addfield('category', 'groceries and cooked meals') \
+    .convert('food_priority', parse_food_priority) \
+    .addfield('supplemental_data', construct_supplemental_data) \
+    .addfield('completed_on', determine_food_completion) \
+    .addfield('name', compose_food_need_name) \
+    .cut('nhs_number',
+         'category',
+         'name',
+         'completed_on',
+         'supplemental_data',
+         'created_at',
+         'updated_at')
 
 # Impure: Uses global header_map variable
 def compose_body(row):
@@ -65,9 +88,9 @@ def compose_body(row):
            if value['label'] and row[key].strip()]
   return "\n".join(lines)
 
-def is_completed(row):
+def determine_triage_completion(row):
   completed_values = ['yes', 'no 3 attempts made']
-  return row['was_contact_made'].lower() in completed_values
+  return row['created_at'] if row['was_contact_made'].lower() in completed_values else None
 
 def generate_call_notes(row):
   was_contact_made = row['was_contact_made'].lower()
@@ -93,3 +116,24 @@ def generate_call_notes(row):
       category,
       MSG_CALL_LOG_NOTE
     ]
+
+def parse_food_priority(value):
+  return re.search(r'priority (\d)', value, re.IGNORECASE) \
+           .group(1)
+
+def determine_food_completion(row):
+  return row['created_at'] if row['food_priority'] in ['1', '2'] else None
+
+# TODO: Add food_service_type, if possible
+def construct_supplemental_data(row):
+  keys = ['food_priority']
+  supplemental_data = { key: row[key] for key in keys if row[key] }
+  return json.dumps(supplemental_data) if len(supplemental_data) else None
+
+# needs.name is used as a description in the app
+def compose_food_need_name(row):
+  lines = [MSG_IDENTIFIED_NEED]
+  if row['completed_on']:
+    lines.append(MSG_CLOSED_FOOD_NEED)
+  lines.append(compose_body(row))
+  return "\n".join(lines)

@@ -27,7 +27,7 @@ header_map = {
     'original': 'If no support needed, what support are they getting and who is supporting them eg Govt food parcels/Age Uk/Other VCS, family member, friends, neighbours). If support need is likely to change eg resident would like a call back to check in with them - selec',
     'label': 'If no support needed, what support are they getting'
   },
-  'food_requirements_priority': {
+  'food_priority': {
     'original': 'Food Requirements Priority ',
     'label': 'Food requirements priority'
   },
