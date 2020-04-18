@@ -1,6 +1,6 @@
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import click
 import petl as etl
@@ -18,7 +18,9 @@ MSG_CLOSED_FOOD_NEED = '[Import]: Marked completed because priority 1 and 2 food
 @click.argument('calls_file_path')
 @click.option('--needs-output', 'needs_output_file_path')
 @click.option('--notes-output', 'notes_output_file_path')
-def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_path):
+@click.option('--food-user', 'food_team_user', required=True, type=int)
+def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_path,
+                  food_team_user):
   """Prepares call log records for import into a temporary calls table"""
 
   # Expected file is in 'windows-1252' file encoding
@@ -75,12 +77,14 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .convert('food_priority', parse_food_priority) \
     .addfield('supplemental_data', construct_supplemental_data) \
     .addfield('completed_on', determine_food_completion) \
-    .addfield('name', compose_food_need_name) \
+    .addfield('user_id', food_team_user) \
+    .addfield('name', compose_food_need_desc) \
     .cut('nhs_number',
          'category',
          'name',
          'completed_on',
          'supplemental_data',
+         'user_id',
          'created_at',
          'updated_at')
 
@@ -90,7 +94,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .convert('callback_date', parse_callback_date) \
     .select(needs_callback) \
     .addfield('category', 'phone triage') \
-    .addfield('name', compose_callback_need_name) \
+    .addfield('name', compose_callback_need_desc) \
     .addfield('start_on', determine_callback_start_date) \
     .cut('nhs_number',
          'category',
@@ -105,7 +109,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
 def compose_body(row):
   lines = [f"{value['label']}: {row[key].strip()}"
            for key, value in header_map.items()
-           if value['label'] and row[key].strip()]
+           if value['label'] and row[key] and row[key].strip()]
   return "\n".join(lines)
 
 def determine_triage_completion(row):
@@ -151,7 +155,7 @@ def construct_supplemental_data(row):
   return json.dumps(supplemental_data) if len(supplemental_data) else None
 
 # needs.name is used as a description in the app
-def compose_food_need_name(row):
+def compose_food_need_desc(row):
   lines = [MSG_IDENTIFIED_NEED]
   if row['completed_on']:
     lines.append(MSG_CLOSED_FOOD_NEED)
@@ -168,7 +172,7 @@ def parse_callback_date(value):
     for fmt in possible_formats:
       try:
         return datetime.strptime(date_like_string, fmt) \
-                       .date()
+                       .date().isoformat()
       except ValueError:
         pass
 
@@ -184,7 +188,9 @@ def needs_callback(row):
          or row['book_weekly_food_delivery'] == True
 
 def determine_callback_start_date(row):
-  return row['callback_date'] or row['created_at'] + timedelta(days=6)
+  return row['callback_date'] \
+         or date.fromisoformat(row['created_at']) + timedelta(days=6)
 
-def compose_callback_need_name(row):
+# needs.name is used as a description in the app
+def compose_callback_need_desc(row):
   return MSG_IDENTIFIED_CALLBACK_NEED + '\n' + compose_body(row)

@@ -8,4 +8,4 @@ def serialize_row(keys):
 def parse_date(value):
   input_format = '%d/%m/%Y'
   return datetime.strptime(value, input_format) \
-                 .date()
+                 .date().isoformat()
