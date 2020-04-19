@@ -94,7 +94,7 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
   # TODO: Confirm it's simple_needs_user
   prescription_needs = (
     spreadsheet
-    .selectnotnone('addl_medication_prescriptions')
+    .select(lambda row: row['addl_medication_prescriptions'])
     .addfield('category', 'prescription pickups')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', simple_needs_user)
@@ -103,7 +103,7 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
 
   mental_wellbeing_needs = (
     spreadsheet
-    .selectnotnone('addl_mental_wellbeing')
+    .select(lambda row: row['addl_mental_wellbeing'])
     .addfield('category', 'physical and mental wellbeing')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', complex_needs_user)
@@ -112,7 +112,7 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
 
   financial_needs = (
     spreadsheet
-    .selectnotnone('addl_financial')
+    .select(lambda row: row['addl_financial'])
     .addfield('category', 'financial support')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', complex_needs_user)
