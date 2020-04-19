@@ -2,6 +2,7 @@ import re
 import json
 from datetime import date, datetime, timedelta
 from functools import partial
+from os.path import join
 
 import click
 import petl as etl
@@ -18,13 +19,13 @@ MSG_OTHER_NEED = '[Import]: Need created automatically because the imported call
 
 @click.command()
 @click.argument('calls_file_path')
-@click.option('--needs-output', 'needs_output_file_path')
-@click.option('--notes-output', 'notes_output_file_path')
+@click.option('-o', '--output-dir', 'output_dir', required=True,
+              type=click.Path(exists=True, file_okay=False, writable=True))
 @click.option('-fnu', '--food-needs-user', 'food_needs_user', required=True, type=int)
 @click.option('-cnu', '--complex-needs-user', 'complex_needs_user', required=True, type=int)
 @click.option('-snu', '--simple-needs-user', 'simple_needs_user', required=True, type=int)
-def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_path,
-                  food_needs_user, complex_needs_user, simple_needs_user):
+def prepare_calls(calls_file_path, output_dir, food_needs_user,
+                  complex_needs_user, simple_needs_user):
   """Prepares call log records for import"""
 
   # Expected file is in 'windows-1252' file encoding
@@ -36,17 +37,8 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('created_at', lambda row: row['latest_attempt_date']) \
     .addfield('updated_at', lambda row: row['latest_attempt_date'])
 
-  needs_fields_base = ['nhs_number',
-                       'category',
-                       'name',
-                       'created_at',
-                       'updated_at']
-
-  notes_fields_base = ['nhs_number',
-                       'category',
-                       'body',
-                       'created_at',
-                       'updated_at']
+  needs_fields = ['nhs_number', 'category', 'name', 'created_at', 'updated_at']
+  notes_fields = ['nhs_number', 'category', 'body', 'created_at', 'updated_at']
 
   # TODO: Leave unassigned?
   original_triage_needs = (
@@ -54,7 +46,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'phone triage')
     .addfield('name', MSG_ORIGINAL_TRIAGE_NEED)
     .addfield('completed_on', determine_triage_completion)
-    .cut(*needs_fields_base, 'completed_on')
+    .cut(*needs_fields, 'completed_on')
   )
 
   # TODO: infer voicemail notes from outcome field
@@ -64,14 +56,14 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .selectnotnone('was_contact_made')
     .rowmapmany(generate_call_notes, header=generated_header)
     .addfield('body', MSG_CALL_LOG_NOTE)
-    .cut(*notes_fields_base)
+    .cut(*notes_fields)
   )
 
   original_triage_import_notes = (
     spreadsheet
     .addfield('category', 'phone_import')
     .addfield('body', partial(compose_body, fields=header_map))
-    .cut(*notes_fields_base, 'import_data')
+    .cut(*notes_fields, 'import_data')
   )
 
   food_needs = (
@@ -83,7 +75,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('completed_on', determine_food_completion)
     .addfield('user_id', food_needs_user)
     .addfield('name', partial(compose_food_need_desc, fields=header_map))
-    .cut(*needs_fields_base, 'completed_on', 'supplemental_data', 'user_id')
+    .cut(*needs_fields, 'completed_on', 'supplemental_data', 'user_id')
   )
 
   # TODO: Leave unassigned?
@@ -94,7 +86,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'phone triage')
     .addfield('name', partial(compose_callback_need_desc, fields=header_map))
     .addfield('start_on', determine_callback_start_date)
-    .cut(*needs_fields_base, 'start_on')
+    .cut(*needs_fields, 'start_on')
   )
 
   # TODO: Confirm it's simple_needs_user
@@ -104,7 +96,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'prescription pickups')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', simple_needs_user)
-    .cut(*needs_fields_base, 'user_id')
+    .cut(*needs_fields, 'user_id')
   )
 
   mental_wellbeing_needs = (
@@ -113,7 +105,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'physical and mental wellbeing')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', complex_needs_user)
-    .cut(*needs_fields_base, 'user_id')
+    .cut(*needs_fields, 'user_id')
   )
 
   financial_needs = (
@@ -122,7 +114,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'financial support')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', complex_needs_user)
-    .cut(*needs_fields_base, 'user_id')
+    .cut(*needs_fields, 'user_id')
   )
 
   # TODO: Create two needs if resident has simple and complex need, or just one complex need?
@@ -132,7 +124,7 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
     .addfield('category', 'other')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
     .addfield('user_id', lambda row: complex_needs_user if has_complex_other_need(row) else simple_needs_user)
-    .cut(*needs_fields_base, 'user_id')
+    .cut(*needs_fields, 'user_id')
   )
 
   # TODO: Add misc_other1 & misc_other2 ?
@@ -148,7 +140,23 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
          'delivery_details',
          'dietary_details',
          'has_covid_symptoms')
-  ).tocsv()
+  )
+
+  # Write files
+  contact_profile_updates.tocsv(join(output_dir, 'contact_profile_updtes.csv'))
+  original_triage_needs.tocsv(join(output_dir, 'original_triage_needs.csv'))
+
+  etl.cat(original_triage_import_notes, original_triage_call_notes) \
+     .tocsv(join(output_dir, 'original_triage_notes.csv'))
+
+  etl.cat(food_needs,
+          callback_needs,
+          prescription_needs,
+          mental_wellbeing_needs,
+          financial_needs,
+          other_needs) \
+     .tocsv(join(output_dir, 'identified_needs.csv'))
+
 
 def compose_body(row, fields, prefix_lines=None):
   lines = [f"{value['label']}: {row[key].strip()}"
