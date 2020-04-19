@@ -51,7 +51,6 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
     .cut(*needs_fields, 'completed_on')
   )
 
-  # TODO: infer voicemail notes from outcome field
   generated_header = ['nhs_number', 'created_at', 'updated_at', 'category']
   original_triage_call_notes = (
     spreadsheet
@@ -144,9 +143,38 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
          'has_covid_symptoms')
   )
 
-  # TODO: Add QA file to summarise inferences for each person, maybe output row counts
+  # TODO: Improve implementation and readability of QA bits (currently loads all tables into memory)
+  # TODO: Consider adding stats to output somewhere for additional QA
+  lookups = {
+    'original_triage_needs': original_triage_needs.dictlookupone('nhs_number'),
+    'original_triage_call_notes': original_triage_call_notes.dictlookup('nhs_number'), # returns list
+    'food_needs': food_needs.dictlookupone('nhs_number'),
+    'callback_needs': callback_needs.dictlookupone('nhs_number'),
+    'remaining_needs': etl.cat(prescription_needs,
+                               mental_wellbeing_needs,
+                               financial_needs,
+                               other_needs).dictlookup('nhs_number') # returns list
+  }
+  quality_assurance = (
+    spreadsheet
+    .addfield('call_log', partial(compose_body, fields=header_map))
+    .addfield('original_triage_status', partial(qa_original_triage_status, lookups['original_triage_needs']))
+    .addfield('original_triage_call_notes', partial(qa_original_triage_call_notes, lookups['original_triage_call_notes']))
+    .addfield('food_need', partial(qa_food_need, lookups['food_needs']))
+    .addfield('callback_need', partial(qa_callback_need, lookups['callback_needs']))
+    .addfield('remaining_needs', partial(qa_remaining_needs, lookups['remaining_needs']))
+    .cut('nhs_number',
+         'latest_attempt_date',
+         'original_triage_status',
+         'original_triage_call_notes',
+         'food_need',
+         'callback_need',
+         'remaining_needs',
+         'call_log')
+  )
 
   # Write files
+  quality_assurance.tocsv(join(output_dir, 'quality_assurance.csv'))
   contact_profile_updates.tocsv(join(output_dir, 'contact_profile_updates.csv'))
   original_triage_needs.tocsv(join(output_dir, 'original_triage_needs.csv'))
 
@@ -310,3 +338,46 @@ def has_simple_other_need(row):
 def determine_callback_start_date(row):
   return (row['callback_date']
           or date.fromisoformat(row['latest_attempt_date']) + timedelta(days=6))
+
+def qa_original_triage_status(lookup, row):
+  match = lookup.get(row['nhs_number'])
+  return 'Completed' if match['completed_on'] else 'To do'
+
+def qa_original_triage_call_notes(lookup, row):
+  matches = lookup.get(row['nhs_number']) # returns list
+  if matches:
+    categories = [ note['category'] for note in matches ]
+    return ', '.join(categories)
+
+def qa_food_need(lookup, row):
+  match = lookup.get(row['nhs_number'])
+  if match:
+    status = 'Completed' if match['completed_on'] else 'To do'
+    assigned_to = match['user_id']
+    priority = (json.loads(match['supplemental_data'])['food_priority']
+                if match['supplemental_data']
+                else None)
+
+    lines = ['Food need created',
+             f'Priority: {priority}',
+             f'Status: {status}',
+             f'Assigned to: {assigned_to}']
+
+    return '\n'.join(lines)
+
+def qa_callback_need(lookup, row):
+  match = lookup.get(row['nhs_number'])
+  if match:
+    start_on = match['start_on']
+
+    lines = ['Callback need created',
+             f'Start on: {start_on}']
+
+    return '\n'.join(lines)
+
+def qa_remaining_needs(lookup, row):
+  matches = lookup.get(row['nhs_number']) # returns list
+  if matches:
+    lines = [f"{need['category'].title()} (Assigned to {need['user_id']})"
+            for need in matches]
+    return '\n'.join(lines)
