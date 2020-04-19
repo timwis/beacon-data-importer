@@ -15,14 +15,14 @@ CREATE TABLE tmp_original_triage_notes (
   body text NOT NULL,
   created_at date NOT NULL,
   updated_at date NOT NULL,
-  import_data jsonb NOT NULL
+  import_data jsonb
 );
 
 DROP TABLE IF EXISTS tmp_identified_needs;
 CREATE TABLE tmp_identified_needs (
   nhs_number text NOT NULL,
   category text NOT NULL,
-  name text NOT NULL,
+  name text,
   created_at date NOT NULL,
   updated_at date NOT NULL,
   completed_on date,
