@@ -29,13 +29,15 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
   """Prepares call log records for import"""
 
   # Expected file is in 'windows-1252' file encoding
-  spreadsheet = etl.fromcsv(calls_file_path, encoding='windows-1252') \
-    .rename(rename_map) \
-    .addfield('import_data', partial(serialize_row, keys=header_map.keys())) \
-    .selectnotnone('latest_attempt_date') \
-    .convert('latest_attempt_date', parse_date) \
-    .addfield('created_at', lambda row: row['latest_attempt_date']) \
+  spreadsheet = (
+    etl.fromcsv(calls_file_path, encoding='windows-1252')
+    .rename(rename_map)
+    .select(lambda row: row['latest_attempt_date'])
+    .addfield('import_data', partial(serialize_row, keys=header_map.keys()))
+    .convert('latest_attempt_date', parse_date)
+    .addfield('created_at', lambda row: row['latest_attempt_date'])
     .addfield('updated_at', lambda row: row['latest_attempt_date'])
+  )
 
   needs_fields = ['nhs_number', 'category', 'name', 'created_at', 'updated_at']
   notes_fields = ['nhs_number', 'category', 'body', 'created_at', 'updated_at']
@@ -142,8 +144,10 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
          'has_covid_symptoms')
   )
 
+  # TODO: Add QA file to summarise inferences for each person, maybe output row counts
+
   # Write files
-  contact_profile_updates.tocsv(join(output_dir, 'contact_profile_updtes.csv'))
+  contact_profile_updates.tocsv(join(output_dir, 'contact_profile_updates.csv'))
   original_triage_needs.tocsv(join(output_dir, 'original_triage_needs.csv'))
 
   etl.cat(original_triage_import_notes, original_triage_call_notes) \
@@ -156,7 +160,6 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
           financial_needs,
           other_needs) \
      .tocsv(join(output_dir, 'identified_needs.csv'))
-
 
 def compose_body(row, fields, prefix_lines=None):
   lines = [f"{value['label']}: {row[key].strip()}"
