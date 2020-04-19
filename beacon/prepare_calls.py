@@ -153,13 +153,15 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
   etl.cat(original_triage_import_notes, original_triage_call_notes) \
      .tocsv(join(output_dir, 'original_triage_notes.csv'))
 
-  etl.cat(food_needs,
-          callback_needs,
-          prescription_needs,
+  # psql copy meta command hangs when importing fully combined needs file
+  food_needs.tocsv(join(output_dir, 'food_needs.csv'))
+  callback_needs.tocsv(join(output_dir, 'callback_needs.csv'))
+
+  etl.cat(prescription_needs,
           mental_wellbeing_needs,
           financial_needs,
           other_needs) \
-     .tocsv(join(output_dir, 'identified_needs.csv'))
+     .tocsv(join(output_dir, 'remaining_needs.csv'))
 
 def compose_body(row, fields, prefix_lines=None):
   lines = [f"{value['label']}: {row[key].strip()}"

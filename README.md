@@ -72,7 +72,9 @@ Load prepared files into the temporary loading tables.
 ```bash
 heroku pg:psql --app <app-name> --command "\COPY tmp_original_triage_needs (nhs_number, category, name, created_at, updated_at, completed_on) FROM original_triage_needs.csv DELIMITER ',' CSV HEADER"
 heroku pg:psql --app <app-name> --command "\COPY tmp_original_triage_notes (nhs_number, category, body, created_at, updated_at, import_data) FROM original_triage_notes.csv DELIMITER ',' CSV HEADER"
-heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, completed_on, supplemental_data, user_id, start_on) FROM identified_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, completed_on, supplemental_data, user_id) FROM food_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, start_on) FROM callback_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, user_id) FROM remaining_needs.csv DELIMITER ',' CSV HEADER"
 heroku pg:psql --app <app-name> --command "\COPY tmp_contact_profile_updates (nhs_number, additional_info, delivery_details, dietary_details, has_covid_symptoms) FROM contact_profile_updates.csv DELIMITER ',' CSV HEADER"
 ```
 
