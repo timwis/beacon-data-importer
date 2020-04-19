@@ -49,85 +49,106 @@ def prepare_calls(calls_file_path, needs_output_file_path, notes_output_file_pat
                        'updated_at']
 
   # TODO: Leave unassigned?
-  original_triage_needs = spreadsheet \
-    .addfield('category', 'phone triage') \
-    .addfield('name', MSG_ORIGINAL_TRIAGE_NEED) \
-    .addfield('completed_on', determine_triage_completion) \
+  original_triage_needs = (
+    spreadsheet
+    .addfield('category', 'phone triage')
+    .addfield('name', MSG_ORIGINAL_TRIAGE_NEED)
+    .addfield('completed_on', determine_triage_completion)
     .cut(*needs_fields_base, 'completed_on')
+  )
 
   # TODO: infer voicemail notes from outcome field
   generated_header = ['nhs_number', 'created_at', 'updated_at', 'category']
-  original_triage_call_notes = spreadsheet \
-    .selectnotnone('was_contact_made') \
-    .rowmapmany(generate_call_notes, header=generated_header) \
-    .addfield('body', MSG_CALL_LOG_NOTE) \
+  original_triage_call_notes = (
+    spreadsheet
+    .selectnotnone('was_contact_made')
+    .rowmapmany(generate_call_notes, header=generated_header)
+    .addfield('body', MSG_CALL_LOG_NOTE)
     .cut(*notes_fields_base)
+  )
 
-  original_triage_import_notes = spreadsheet \
-    .addfield('category', 'phone_import') \
-    .addfield('body', partial(compose_body, fields=header_map)) \
-    .cut(*notes_fields_base, 'import_data').tocsv()
+  original_triage_import_notes = (
+    spreadsheet
+    .addfield('category', 'phone_import')
+    .addfield('body', partial(compose_body, fields=header_map))
+    .cut(*notes_fields_base, 'import_data')
+  )
 
-  food_needs = spreadsheet \
-    .select(needs_food) \
-    .addfield('category', 'groceries and cooked meals') \
-    .convert('food_priority', parse_food_priority) \
-    .addfield('supplemental_data', construct_supplemental_data) \
-    .addfield('completed_on', determine_food_completion) \
-    .addfield('user_id', food_needs_user) \
-    .addfield('name', partial(compose_food_need_desc, fields=header_map)) \
+  food_needs = (
+    spreadsheet
+    .select(needs_food)
+    .addfield('category', 'groceries and cooked meals')
+    .convert('food_priority', parse_food_priority)
+    .addfield('supplemental_data', construct_supplemental_data)
+    .addfield('completed_on', determine_food_completion)
+    .addfield('user_id', food_needs_user)
+    .addfield('name', partial(compose_food_need_desc, fields=header_map))
     .cut(*needs_fields_base, 'completed_on', 'supplemental_data', 'user_id')
+  )
 
   # TODO: Leave unassigned?
-  callback_needs = spreadsheet \
-    .convert('callback_date', parse_callback_date) \
-    .select(needs_callback) \
-    .addfield('category', 'phone triage') \
-    .addfield('name', partial(compose_callback_need_desc, fields=header_map)) \
-    .addfield('start_on', determine_callback_start_date) \
+  callback_needs = (
+    spreadsheet
+    .convert('callback_date', parse_callback_date)
+    .select(needs_callback)
+    .addfield('category', 'phone triage')
+    .addfield('name', partial(compose_callback_need_desc, fields=header_map))
+    .addfield('start_on', determine_callback_start_date)
     .cut(*needs_fields_base, 'start_on')
+  )
 
   # TODO: Confirm it's simple_needs_user
-  prescription_needs = spreadsheet \
-    .selectnotnone('addl_medication_prescriptions') \
-    .addfield('category', 'prescription pickups') \
-    .addfield('name', compose_other_need_desc) \
-    .addfield('user_id', simple_needs_user) \
+  prescription_needs = (
+    spreadsheet
+    .selectnotnone('addl_medication_prescriptions')
+    .addfield('category', 'prescription pickups')
+    .addfield('name', partial(compose_other_need_desc, fields=header_map))
+    .addfield('user_id', simple_needs_user)
     .cut(*needs_fields_base, 'user_id')
+  )
 
-  mental_wellbeing_needs = spreadsheet \
-    .selectnotnone('addl_mental_wellbeing') \
-    .addfield('category', 'physical and mental wellbeing') \
-    .addfield('name', compose_other_need_desc) \
-    .addfield('user_id', complex_needs_user) \
+  mental_wellbeing_needs = (
+    spreadsheet
+    .selectnotnone('addl_mental_wellbeing')
+    .addfield('category', 'physical and mental wellbeing')
+    .addfield('name', partial(compose_other_need_desc, fields=header_map))
+    .addfield('user_id', complex_needs_user)
     .cut(*needs_fields_base, 'user_id')
+  )
 
-  financial_needs = spreadsheet \
-    .selectnotnone('addl_financial') \
-    .addfield('category', 'financial support') \
-    .addfield('name', compose_other_need_desc) \
-    .addfield('user_id', complex_needs_user) \
+  financial_needs = (
+    spreadsheet
+    .selectnotnone('addl_financial')
+    .addfield('category', 'financial support')
+    .addfield('name', partial(compose_other_need_desc, fields=header_map))
+    .addfield('user_id', complex_needs_user)
     .cut(*needs_fields_base, 'user_id')
+  )
 
   # TODO: Create two needs if resident has simple and complex need, or just one complex need?
-  other_needs = spreadsheet \
-    .select(needs_other_support) \
-    .addfield('category', 'other') \
-    .addfield('name', compose_other_need_desc) \
-    .addfield('user_id', lambda row: complex_needs_user if has_complex_need(row) else simple_needs_user) \
+  other_needs = (
+    spreadsheet
+    .select(needs_other_support)
+    .addfield('category', 'other')
+    .addfield('name', partial(compose_other_need_desc, fields=header_map))
+    .addfield('user_id', lambda row: complex_needs_user if has_complex_other_need(row) else simple_needs_user)
     .cut(*needs_fields_base, 'user_id')
+  )
 
   # TODO: Add misc_other1 & misc_other2 ?
-  contact_profile_updates = spreadsheet \
-    .addfield('additional_info', partial(compose_additional_info, fields=header_map)) \
-    .addfield('delivery_details', partial(compose_delivery_details, fields=header_map)) \
-    .addfield('dietary_details', compose_dietary_details) \
-    .convert('has_covid_symptoms', parse_covid_symptoms) \
+  # TODO: prefix with [Import]
+  contact_profile_updates = (
+    spreadsheet
+    .addfield('additional_info', partial(compose_additional_info, fields=header_map))
+    .addfield('delivery_details', partial(compose_delivery_details, fields=header_map))
+    .addfield('dietary_details', compose_dietary_details)
+    .convert('has_covid_symptoms', parse_covid_symptoms)
     .cut('nhs_number',
          'additional_info',
          'delivery_details',
          'dietary_details',
          'has_covid_symptoms')
+  ).tocsv()
 
 def compose_body(row, fields, prefix_lines=None):
   lines = [f"{value['label']}: {row[key].strip()}"
@@ -186,15 +207,15 @@ def parse_covid_symptoms(value):
 
 def generate_call_notes(row):
   was_contact_made = row['was_contact_made'].lower()
-  failure_category = 'phone_message' \
-    if row['outcome'] == 'Left voicemail' \
-    else 'phone_failure'
+  failure_category = ('phone_message'
+    if row['outcome'] == 'Left voicemail'
+    else 'phone_failure')
 
   if was_contact_made == 'yes':
     category = 'phone_success'
     count = 1
-  elif was_contact_made == 'no -1 attempt made' \
-    or was_contact_made == 'invalid phone numbers':
+  elif (was_contact_made == 'no -1 attempt made'
+    or was_contact_made == 'invalid phone numbers'):
     category = failure_category
     count = 1
   elif was_contact_made == 'no 2 attempts made':
@@ -243,36 +264,36 @@ def parse_callback_date(value):
 
 def needs_food(row):
   # source data uses trailing space
-  return row['outcome'] in ['Food referral ', 'Food and Other referral'] \
-         or row['food_priority']
+  return (row['outcome'] in ['Food referral ', 'Food and Other referral']
+          or row['food_priority'])
 
 def needs_callback(row):
-  return row['callback_date'] \
-         or needs_food(row) \
-         or row['book_weekly_food_delivery'] == True \
-         or row['outcome'] == 'Call back ' # source data uses trailing space
+  return (row['callback_date']
+          or needs_food(row)
+          or row['book_weekly_food_delivery'] == True
+          or row['outcome'] == 'Call back ') # source data uses trailing space
 
 def needs_other_support(row):
-  return row['outcome'] in ['Other referral', 'Food and Other referral'] \
-    or has_complex_other_need(row) \
-    or has_simple_other_need(row)
+  return (row['outcome'] in ['Other referral', 'Food and Other referral']
+          or has_complex_other_need(row)
+          or has_simple_other_need(row))
 
 # TODO: Confirm this list
 # TODO: Consider including finance here since they're assigned to MDT anyway
 def has_complex_other_need(row):
-  return row['addl_adult_social_care'] \
-         or row['addl_children_services'] \
-         or row['addl_safeguarding']
+  return (row['addl_adult_social_care']
+          or row['addl_children_services']
+          or row['addl_safeguarding'])
 
 # TODO: Confirm this list
 # TODO: Should we exclude shopping from 'other' needs?
 # TODO: Consider including addl_misc_other1 and addl_misc_other2
 def has_simple_other_need(row):
-  return row['addl_housing_waste'] \
-         or row['addl_medical_appt_transport'] \
-         or row['addl_shopping'] \
-         or row['addl_referrals']
+  return (row['addl_housing_waste']
+          or row['addl_medical_appt_transport']
+          or row['addl_shopping']
+          or row['addl_referrals'])
 
 def determine_callback_start_date(row):
-  return row['callback_date'] \
-         or date.fromisoformat(row['latest_attempt_date']) + timedelta(days=6)
+  return (row['callback_date']
+          or date.fromisoformat(row['latest_attempt_date']) + timedelta(days=6))
