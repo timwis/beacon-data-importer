@@ -58,19 +58,24 @@ heroku pg:psql --app <app-name> --command "\COPY contacts (nhs_number, first_nam
 Prepare the data for import using the `beacon` CLI tool.
 
 ```bash
-beacon prepare-calls calls.csv > clean-calls.csv
+beacon prepare-calls --food-needs-user USER --complex-needs-user USER --simple-needs-user USER --output-dir ./output calls.csv
 ```
 
-Create the `tmp_calls` table.
+Create the temporary loading tables.
 
 ```bash
-heroku pg:psql --app <app-name> --file sql/create_tmp_calls_table.sql
+heroku pg:psql --app <app-name> --file sql/create_tmp_tables.sql
 ```
 
-Load `clean-calls.csv` into that table.
+Load prepared files into the temporary loading tables.
 
 ```bash
-heroku pg:psql --app <app-name> --command "\COPY tmp_calls (nhs_number, latest_attempt_date, body, import_data) FROM clean-calls.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_original_triage_needs (nhs_number, category, name, created_at, updated_at, completed_on) FROM original_triage_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_original_triage_notes (nhs_number, category, body, created_at, updated_at, import_data) FROM original_triage_notes.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, completed_on, supplemental_data, user_id) FROM food_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, start_on) FROM callback_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_identified_needs (nhs_number, category, name, created_at, updated_at, user_id) FROM remaining_needs.csv DELIMITER ',' CSV HEADER"
+heroku pg:psql --app <app-name> --command "\COPY tmp_contact_profile_updates (nhs_number, additional_info, delivery_details, dietary_details, has_covid_symptoms) FROM contact_profile_updates.csv DELIMITER ',' CSV HEADER"
 ```
 
 You can verify it's been loaded in via the psql tool. Use `\q` to quit.
@@ -79,19 +84,21 @@ You can verify it's been loaded in via the psql tool. Use `\q` to quit.
 
 ```bash
 heroku pg:psql --app <app-name>
-=> select * from tmp_calls;
+=> select * from tmp_original_triage_needs;
 ```
 
-Convert the imported calls to needs and notes records.
+Import the data from the temporary loading tables into the application tables.
 
 ```bash
-heroku pg:psql --app <app-name> --file sql/convert_calls_to_needs_and_notes.sql
+heroku pg:psql --app <app-name> --file sql/import_original_triage_needs_and_notes.sql
+heroku pg:psql --app <app-name> --file sql/import_identified_needs.sql
+heroku pg:psql --app <app-name> --file sql/import_contact_profile_updates.sql
 ```
 
 Remove the temporary calls table you created.
 
 ```bash
-heroku pg:psql --app <app-name> --command "DROP TABLE tmp_calls"
+heroku pg:psql --app <app-name> --command "DROP TABLE tmp_original_triage_needs, tmp_original_triage_notes, tmp_identified_needs, tmp_contact_profile_updates"
 ```
 
 [csvlook]: https://csvkit.readthedocs.io/en/latest/scripts/csvlook.html
