@@ -24,8 +24,9 @@ MSG_OTHER_NEED = '[Import]: Need created automatically because the imported call
 @click.option('-fnu', '--food-needs-user', 'food_needs_user', required=True, type=int)
 @click.option('-cnu', '--complex-needs-user', 'complex_needs_user', required=True, type=int)
 @click.option('-snu', '--simple-needs-user', 'simple_needs_user', required=True, type=int)
+@click.option('-clru', '--call-log-review-user', 'call_log_review_user', required=True, type=int)
 def prepare_calls(calls_file_path, output_dir, food_needs_user,
-                  complex_needs_user, simple_needs_user):
+                  complex_needs_user, simple_needs_user, call_log_review_user):
   """Prepares call log records for import"""
 
   # Expected file is in 'windows-1252' file encoding
@@ -42,7 +43,6 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
   needs_fields = ['nhs_number', 'category', 'name', 'created_at', 'updated_at']
   notes_fields = ['nhs_number', 'category', 'body', 'created_at', 'updated_at']
 
-  # TODO: Leave unassigned?
   original_triage_needs = (
     spreadsheet
     .addfield('category', 'phone triage')
@@ -79,7 +79,6 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
     .cut(*needs_fields, 'completed_on', 'supplemental_data', 'user_id')
   )
 
-  # TODO: Leave unassigned?
   callback_needs = (
     spreadsheet
     .convert('callback_date', parse_callback_date)
@@ -90,7 +89,6 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
     .cut(*needs_fields, 'start_on')
   )
 
-  # TODO: Confirm it's simple_needs_user
   prescription_needs = (
     spreadsheet
     .select(lambda row: row['addl_medication_prescriptions'])
@@ -118,17 +116,18 @@ def prepare_calls(calls_file_path, output_dir, food_needs_user,
     .cut(*needs_fields, 'user_id')
   )
 
-  # TODO: Create two needs if resident has simple and complex need, or just one complex need?
   other_needs = (
     spreadsheet
     .select(needs_other_support)
     .addfield('category', 'other')
     .addfield('name', partial(compose_other_need_desc, fields=header_map))
-    .addfield('user_id', lambda row: complex_needs_user if has_complex_other_need(row) else simple_needs_user)
+    .addfield('user_id', partial(determine_other_need_user,
+                                 complex_needs_user=complex_needs_user,
+                                 simple_needs_user=simple_needs_user,
+                                 call_log_review_user=call_log_review_user))
     .cut(*needs_fields, 'user_id')
   )
 
-  # TODO: Add misc_other1 & misc_other2 ?
   # TODO: prefix with [Import]
   contact_profile_updates = (
     spreadsheet
@@ -281,11 +280,14 @@ def parse_food_priority(value):
 def determine_food_completion(row):
   return row['latest_attempt_date'] if row['food_priority'] in ['1', '2'] else None
 
-# TODO: Add food_service_type, if possible
 def construct_supplemental_data(row):
-  keys = ['food_priority']
-  supplemental_data = { key: row[key] for key in keys if row[key] }
-  return json.dumps(supplemental_data) if len(supplemental_data) else None
+  supplemental_data = {
+    'food_service_type': 'Grocery delivery'
+  }
+  if row['food_priority']:
+    supplemental_data['food_priority'] = row['food_priority']
+
+  return json.dumps(supplemental_data)
 
 def parse_callback_date(value):
   date_like_string = re.search(r'(\d+[/\.]\d+[/\.]\d+)', value).group(1)
@@ -317,27 +319,33 @@ def needs_callback(row):
 def needs_other_support(row):
   return (row['outcome'] in ['Other referral', 'Food and Other referral']
           or has_complex_other_need(row)
-          or has_simple_other_need(row))
+          or has_simple_other_need(row)
+          or has_value_in_misc_fields(row))
 
-# TODO: Confirm this list
-# TODO: Consider including finance here since they're assigned to MDT anyway
 def has_complex_other_need(row):
   return (row['addl_adult_social_care']
           or row['addl_children_services']
           or row['addl_safeguarding'])
 
-# TODO: Confirm this list
-# TODO: Should we exclude shopping from 'other' needs?
-# TODO: Consider including addl_misc_other1 and addl_misc_other2
 def has_simple_other_need(row):
   return (row['addl_housing_waste']
           or row['addl_medical_appt_transport']
-          or row['addl_shopping']
           or row['addl_referrals'])
+
+def has_value_in_misc_fields(row):
+  return row['addl_misc_other1'] or row['addl_misc_other2']
 
 def determine_callback_start_date(row):
   return (row['callback_date']
           or date.fromisoformat(row['latest_attempt_date']) + timedelta(days=6))
+
+def determine_other_need_user(row, simple_needs_user, complex_needs_user, call_log_review_user):
+  if has_complex_other_need(row):
+    return complex_needs_user
+  elif has_simple_other_need(row):
+    return has_simple_other_need
+  else:
+    return call_log_review_user
 
 def qa_original_triage_status(lookup, row):
   match = lookup.get(row['nhs_number'])
@@ -354,7 +362,7 @@ def qa_food_need(lookup, row):
   if match:
     status = 'Completed' if match['completed_on'] else 'To do'
     assigned_to = match['user_id']
-    priority = (json.loads(match['supplemental_data'])['food_priority']
+    priority = (json.loads(match['supplemental_data']).get('food_priority', '')
                 if match['supplemental_data']
                 else None)
 
