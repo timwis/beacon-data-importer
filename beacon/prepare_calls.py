@@ -343,7 +343,7 @@ def determine_other_need_user(row, simple_needs_user, complex_needs_user, call_l
   if has_complex_other_need(row):
     return complex_needs_user
   elif has_simple_other_need(row):
-    return has_simple_other_need
+    return simple_needs_user
   else:
     return call_log_review_user
 
