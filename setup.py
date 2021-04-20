@@ -6,7 +6,7 @@ setup(
     packages=["beacon"],
     install_requires=[
         "click==7.1",
-        "petl==1.3",
+        "petl==1.7.4",
     ],
     entry_points="""
       [console_scripts]
